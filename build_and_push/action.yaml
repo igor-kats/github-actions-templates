@@ -1,0 +1,55 @@
+#action
+---
+name: 'Building and pushing image with final tag'
+description: 'builds tag and image, and pushes it to a dedicated ECR repository'
+inputs:
+  service_name:
+    description: 'Name of the service to build and push'
+    required: true
+  account_id:
+    description: 'AWS account id'
+    required: true
+  dockerfile_path:
+    description: 'Path to the Dockerfile'
+    required: true
+  dockerfile_context:
+    description: 'Path to the context of the Dockerfile'
+    required: false
+  docker_build_args:
+    description: 'Build arguments for the Dockerfile'
+    required: false
+  pre_test_check:
+    description: 'Checks if pre test flag exists'
+    required: false
+  build_kit:
+    description: 'add buildkit before docker command'
+    required: false
+
+outputs:
+  tag_name:
+    description: 'Name of the tag'
+    value: ${{ steps.build_and_push.outputs.tag_name }}
+  image_uri:
+    description: 'Full name of the image'
+    value: ${{ steps.build_and_push.outputs.image_uri }}
+  commit_sha:
+    description: 'Commit SHA of the image'
+    value: ${{ steps.build_and_push.outputs.commit_sha }}
+
+runs:
+  using: "composite"
+  steps:
+  - run: chmod +x ${{ github.action_path }}/build-and-push.sh
+    shell: bash
+  - id: build_and_push
+    run: ${{ github.action_path }}/build-and-push.sh
+    shell: bash
+    env:
+      SERVICE_NAME: ${{ inputs.service_name }}
+      ACCOUNT_ID: ${{ inputs.account_id }}
+      DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+      DOCKERFILE_CONTEXT: ${{ inputs.dockerfile_context }}
+      DOCKER_BUILD_ARGS: ${{ inputs.docker_build_args }}
+      PRE_TEST_CHECK: ${{ inputs.pre_test_check }}
+      BUILD_KIT: ${{ inputs.build_kit }}
+

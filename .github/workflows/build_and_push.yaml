@@ -1,0 +1,103 @@
+# Reusable workflow to build and push a Docker image to AWS ECR.
+
+name: 'Building and pushing an image'
+
+# Specifies that this workflow can be called by other workflows.
+on:
+  workflow_call:
+    inputs:
+      # The name of the service being built.
+      service_name:
+        required: true
+        type: string
+      # AWS account ID where the ECR repository resides.
+      account_id:
+        required: true
+        type: string
+      # Path to the Dockerfile used for building the image.
+      dockerfile_path:
+        required: true
+        type: string
+      # (Optional) Directory containing the Dockerfile context.
+      dockerfile_context:
+        required: false
+        type: string
+      # Arguments to pass to the Docker build process.
+      docker_build_args:
+        required: true
+        type: string
+      # Flag to enable or disable pre-test checks (default: true).
+      pre_test_check:
+        required: false
+        type: boolean
+        default: true
+      # (Optional) Enables BuildKit for the Docker build process.
+      build_kit:
+        required: false
+        type: string
+        default: ''
+      # Specifies the runner labels for this workflow (default: YOUR RUNNER LABEL).
+      runners:
+        description: 'Runner labels (array)'
+        required: false
+        type: string
+        default: '["YOUR RUNNER LABEL"]'
+    secrets:
+      # A token for authenticating with GitHub, provided by the caller workflow.
+      token:
+        description: 'A token passed from the caller workflow'
+        required: false
+
+    outputs:
+      # Outputs the tag name of the built image.
+      tag_name:
+        description: 'Name of the tag'
+        value: ${{ jobs.build_and_push.outputs.tag_name }}
+      # Outputs the commit SHA associated with the image.
+      commit_sha:
+        description: 'Commit SHA of the image'
+        value: ${{ jobs.build_and_push.outputs.commit_sha }}
+      # Outputs the full URI of the built image.
+      image_uri:
+        description: 'Image URI of the image'
+        value: ${{ jobs.build_and_push.outputs.image_uri }}
+
+# Job definition: builds and pushes the Docker image.
+jobs:
+  build_and_push:
+    # Runs on the specified runner labels, parsed from the `runners` input.
+    runs-on: ${{ fromJson(inputs.runners) }}
+    outputs:
+        # Maps job outputs to step outputs for accessibility in the calling workflow.
+        tag_name: ${{ steps.build_and_push.outputs.tag_name }}
+        commit_sha: ${{ steps.build_and_push.outputs.commit_sha }}
+        image_uri: ${{ steps.build_and_push.outputs.image_uri }}
+    steps:
+      # Step 1: Check out the repository containing the code and Dockerfile.
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          # Ensures submodules are checked out recursively if present.
+          submodules: recursive
+          # Uses the token passed from the caller workflow for authentication.
+          token: ${{ secrets.token }}
+      # Step 2: Build and push the Docker image to AWS ECR.
+      - name: build and push
+        id: build_and_push
+        uses: https://github.com/igor-kats/github-actions-templates/build_and_push@main
+        with:
+          # Passes all inputs required for the build_and_push action.
+          service_name: ${{ inputs.service_name }}
+          account_id: ${{ inputs.account_id }}
+          dockerfile_path: ${{ inputs.dockerfile_path }}
+          dockerfile_context: ${{ inputs.dockerfile_context }}
+          docker_build_args: ${{ inputs.docker_build_args }}
+          pre_test_check: ${{ inputs.pre_test_check }}
+          build_kit: ${{ inputs.build_kit }}
+      # Step 3: Output relevant metadata about the built image.
+      - name: tag and commit sha outputs
+        run: |
+          # Appends the tag name to the GitHub step summary for visibility.
+          echo "Image tag is: ${{ steps.build_and_push.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          # Appends the commit SHA to the GitHub step summary for visibility.
+          echo "Image commit SHA: ${{ steps.build_and_push.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
